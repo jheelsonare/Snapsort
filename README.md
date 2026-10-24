@@ -4,7 +4,7 @@ A private Android screenshot organiser built with Kotlin, Jetpack Compose and Ma
 
 ## Download the Android app
 
-[Download the debug APK as a ZIP](https://github.com/jheelsonare/Snapsort/raw/refs/heads/snapsort-download/downloads/SnapSort-download.zip). Extract it and install `SnapSort-debug.apk` on Android 11 or newer. See [downloads](downloads/README.md) for checksums and installation details.
+[Download the debug APK as a ZIP](https://github.com/jheelsonare/Snapsort/raw/refs/heads/main/downloads/SnapSort-download.zip). Extract it and install `SnapSort-debug.apk` on Android 11 or newer. See [downloads](downloads/README.md) for checksums and installation details.
 
 ## Run it
 
