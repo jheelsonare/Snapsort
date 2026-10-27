@@ -6,6 +6,8 @@
 
 These remain emulator checks, not physical-phone certification. The physical Android 11–15/vendor-gallery matrix is a manual release gate and requires actual devices; CI cannot substitute for it.
 
+All workflows pin `ubuntu-24.04` and use its preinstalled Android SDK 35/build-tools 35.0.0, verified by an explicit step. They do not run `android-actions/setup-android@v3`: the initial hosted run failed in that setup action before Gradle or any test executed. Its underlying logs required GitHub sign-in and were unavailable from this cloud session, so the precise internal cause is not claimed. Pinning the image also avoids the announced `ubuntu-latest` migration to Ubuntu 26. Official checkout/setup-java/upload-artifact/setup-gradle actions use their current verified major versions to remove Node 20/deprecation warnings. These configuration fixes still require a successful real hosted rerun.
+
 A failed test remains a failed CI run. Test reports are uploaded even on failure. Review the job log and report; do not rerun until the original failure disappears from the record or describe a targeted rerun as a clean full-suite result.
 
 The release workflow does not automatically certify a build merely because a version tag exists. Before tagging, wait for the exact commit's Android checks to pass and record the physical-device, accessibility, performance, and gallery/trash checks in `VALIDATION.md`. Physical-device and consented-data work still requires actual access to those devices/data.
