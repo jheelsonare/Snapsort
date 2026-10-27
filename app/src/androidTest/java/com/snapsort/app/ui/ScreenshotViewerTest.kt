@@ -219,8 +219,8 @@ class ScreenshotViewerTest {
             }
         }
         val zoomTarget = compose.onNode(hasContentDescription("Zoom in") and hasClickAction()).fetchSemanticsNode().boundsInRoot
-        assertTrue("Zoom touch target width", zoomTarget.width >= 48f * density - 1f)
-        assertTrue("Zoom touch target height", zoomTarget.height >= 48f * density - 1f)
+        assertTrue("Zoom touch target width ${zoomTarget.width}px; expected ${48f * density}px at density $density", zoomTarget.width >= 48f * density - 1f)
+        assertTrue("Zoom touch target height ${zoomTarget.height}px; expected ${48f * density}px at density $density", zoomTarget.height >= 48f * density - 1f)
         compose.onNodeWithText("Select for trash").performScrollTo().assertIsDisplayed().performClick()
         compose.onNodeWithText("2 / 2 · ${second.name}").assertIsDisplayed()
         compose.onNodeWithText("Keep", useUnmergedTree = true).performScrollTo().assertIsDisplayed()

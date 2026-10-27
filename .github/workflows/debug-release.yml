@@ -66,7 +66,12 @@ jobs:
                   shutil.copyfileobj(source, target)
           if sha(apk) != expected['SnapSort-debug.apk']:
               raise SystemExit('APK checksum mismatch; no release will be published.')
-          (output / 'SHA256SUMS').write_text(f"{expected['SnapSort-debug.apk']}  {apk.name}\n")
+          zipped = output / f'SnapSort-{tag}.zip'
+          shutil.copyfile(archive, zipped)
+          (output / 'SHA256SUMS').write_text(
+              f"{expected['SnapSort-debug.apk']}  {apk.name}\n"
+              f"{expected['SnapSort-download.zip']}  {zipped.name}\n"
+          )
           print('ZIP CRC and ZIP/APK SHA256 verified; APK bytes are unchanged.')
           PY
       - name: Verify signature, package, debug flag, and tagged version
@@ -102,4 +107,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" release-assets/*.apk release-assets/SHA256SUMS --verify-tag --prerelease --title "SnapSort $GITHUB_REF_NAME (debug)" --notes-file release-notes.md
+          gh release create "$GITHUB_REF_NAME" release-assets/* --verify-tag --prerelease --title "SnapSort $GITHUB_REF_NAME (debug)" --notes-file release-notes.md

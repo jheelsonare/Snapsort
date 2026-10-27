@@ -39,6 +39,7 @@ class SnapSortViewModel(application: Application) : AndroidViewModel(application
     private var journalInitialized = false
     private var journalError = false
     private var restoreCleanupSelection = true
+    private val selectionRevision = java.util.concurrent.atomic.AtomicLong(0)
     private val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
         override fun onChange(selfChange: Boolean) { refreshDebounced() }
     }
@@ -46,11 +47,17 @@ class SnapSortViewModel(application: Application) : AndroidViewModel(application
     init {
         application.contentResolver.registerContentObserver(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, true, observer)
         viewModelScope.launch {
-            repository.state.map { library -> library.items.mapTo(hashSetOf()) { it.uri } }
-                .distinctUntilChanged().flowOn(Dispatchers.Default).collect { available ->
+            repository.state.mapLatest { library ->
+                val snapshot = library.items
+                withContext(Dispatchers.Default) { snapshot to snapshot.mapTo(hashSetOf()) { it.uri } }
+            }.collect { (snapshot, available) ->
                 // Persist pruning in the authoritative selection as well as in the derived view.
                 // A restored or re-granted URI must never silently become selected again.
-                controls.update { it.copy(selected = it.selected.intersect(available)) }
+                // Ignore queued snapshots that predate a refresh/recovery. In particular, an
+                // initial empty library must not erase a just-recovered selection.
+                if (repository.state.value.items === snapshot) {
+                    controls.update { it.copy(selected = it.selected.intersect(available)) }
+                }
             }
         }
     }
@@ -116,6 +123,14 @@ class SnapSortViewModel(application: Application) : AndroidViewModel(application
 
     fun action(action: AppAction) {
         if (controls.value.busyDeleting && action != AppAction.Refresh && action != AppAction.DismissMessage) return
+        // Recovery may be reading MediaStore while the first gallery frame is already visible.
+        // An explicit user decision must win over a late recovered-selection publication.
+        if (action is AppAction.ToggleSelection || action is AppAction.ChangeCollection ||
+            action == AppAction.SelectAll || action == AppAction.ClearSelection ||
+            action == AppAction.SelectDuplicateExtras || action == AppAction.SelectSupportedGalleryImages ||
+            action is AppAction.MarkKeep || action == AppAction.RemoveSelectedFromCollection) {
+            selectionRevision.incrementAndGet()
+        }
         when (action) {
             AppAction.Refresh -> refresh()
             is AppAction.ChangeCollection -> change { copy(collection = action.value, selected = emptySet()) }
@@ -137,9 +152,10 @@ class SnapSortViewModel(application: Application) : AndroidViewModel(application
             AppAction.SelectDuplicateExtras -> {
                 val snapshot = repository.state.value.items
                 val visible = state.value.visible.mapTo(hashSetOf()) { it.uri }
+                val revision = selectionRevision.get()
                 viewModelScope.launch {
                     val extras = withContext(Dispatchers.Default) { summaryFor(snapshot).duplicateExtras.intersect(visible) }
-                    if (repository.state.value.items === snapshot && !controls.value.busyDeleting) change { copy(selected = extras) }
+                    if (repository.state.value.items === snapshot && selectionRevision.get() == revision && !controls.value.busyDeleting) change { copy(selected = extras) }
                 }
             }
             is AppAction.MarkKeep -> viewModelScope.launch {
@@ -236,7 +252,8 @@ class SnapSortViewModel(application: Application) : AndroidViewModel(application
                 pendingTrash = remaining
                 val visible = repository.state.value.items.mapTo(hashSetOf()) { it.uri }
                 restoreCleanupSelection = false
-                change { copy(selected = observed.present.intersect(visible), cleanupRecoveryPending = remaining != null) }
+                change { copy(selected = if (selectionRevision.get() == 0L) observed.present.intersect(visible) else selected.intersect(visible),
+                    cleanupRecoveryPending = remaining != null) }
             }
             change { copy(busyDeleting = false, message = when {
                 !confirmed -> "Trash request cancelled. Remaining accessible images stay selected."
@@ -289,7 +306,8 @@ class SnapSortViewModel(application: Application) : AndroidViewModel(application
             pendingTrash = remaining
             restoreCleanupSelection = false
             val visible = repository.state.value.items.mapTo(hashSetOf()) { it.uri }
-            change { copy(selected = observed.present.intersect(visible), cleanupRecoveryPending = remaining != null) }
+            change { copy(selected = if (selectionRevision.get() == 0L) observed.present.intersect(visible) else selected.intersect(visible),
+                cleanupRecoveryPending = remaining != null) }
         } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
         catch (_: Exception) {
             journalError = true

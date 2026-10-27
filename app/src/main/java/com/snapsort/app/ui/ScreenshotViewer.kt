@@ -90,23 +90,23 @@ internal fun ScreenshotViewer(
         Surface(Modifier.fillMaxSize(), color = Charcoal) {
             Column(Modifier.fillMaxSize().systemBarsPadding()) {
                 Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onDismiss) { Icon(Icons.Outlined.Close, "Close preview") }
+                    IconButton(modifier = Modifier.size(48.dp), onClick = onDismiss) { Icon(Icons.Outlined.Close, "Close preview") }
                     Column(Modifier.weight(1f)) {
                         Text(if (sequential) "Review screenshots" else "Screenshot", style = MaterialTheme.typography.titleMedium)
                         Text("${position + 1} / ${shots.size} · ${shot.name}", maxLines = 1, overflow = TextOverflow.Ellipsis,
                             style = MaterialTheme.typography.labelSmall, color = Muted)
                     }
-                    IconButton(onClick = { details = true }) { Icon(Icons.Outlined.Info, "Screenshot details and text") }
+                    IconButton(modifier = Modifier.size(48.dp), onClick = { details = true }) { Icon(Icons.Outlined.Info, "Screenshot details and text") }
                 }
                 key(shot.uri) { ReadableImage(shot.uri, shot.name, Modifier.weight(1f).fillMaxWidth()) }
                 Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = { currentUri = shots[position - 1].uri }, enabled = position > 0) {
+                        IconButton(modifier = Modifier.size(48.dp), onClick = { currentUri = shots[position - 1].uri }, enabled = position > 0) {
                             Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Previous screenshot")
                         }
                         Text("${shot.category.label}${if (shot.keep) " · Keep" else ""}", color = Lime,
                             modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
-                        IconButton(onClick = { currentUri = shots[position + 1].uri }, enabled = position < shots.lastIndex) {
+                        IconButton(modifier = Modifier.size(48.dp), onClick = { currentUri = shots[position + 1].uri }, enabled = position < shots.lastIndex) {
                             Icon(Icons.AutoMirrored.Outlined.ArrowForward, "Next screenshot")
                         }
                     }
@@ -250,13 +250,13 @@ private fun ReadableImage(uri: String, name: String, modifier: Modifier = Modifi
         }
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center) {
-            IconButton(onClick = { zoom(1f / 1.5f) }, enabled = image != null && scale > minScale) { Icon(Icons.Outlined.ZoomOut, "Zoom out") }
-            IconButton(onClick = { zoom(1.5f) }, enabled = image != null && scale < maxScale) { Icon(Icons.Outlined.ZoomIn, "Zoom in") }
+            IconButton(modifier = Modifier.size(48.dp), onClick = { zoom(1f / 1.5f) }, enabled = image != null && scale > minScale) { Icon(Icons.Outlined.ZoomOut, "Zoom out") }
+            IconButton(modifier = Modifier.size(48.dp), onClick = { zoom(1.5f) }, enabled = image != null && scale < maxScale) { Icon(Icons.Outlined.ZoomIn, "Zoom in") }
             TextButton(onClick = { if (minScale > 0f) zoom(minScale / scale) }, enabled = image != null) { Text("Fit image") }
-            IconButton(onClick = { offset = clamp(offset + Offset(0f, viewport.height * .7f), scale) }, enabled = image != null) {
+            IconButton(modifier = Modifier.size(48.dp), onClick = { offset = clamp(offset + Offset(0f, viewport.height * .7f), scale) }, enabled = image != null) {
                 Icon(Icons.Outlined.KeyboardArrowUp, "Read earlier part")
             }
-            IconButton(onClick = { offset = clamp(offset - Offset(0f, viewport.height * .7f), scale) }, enabled = image != null) {
+            IconButton(modifier = Modifier.size(48.dp), onClick = { offset = clamp(offset - Offset(0f, viewport.height * .7f), scale) }, enabled = image != null) {
                 Icon(Icons.Outlined.KeyboardArrowDown, "Read later part")
             }
         }
