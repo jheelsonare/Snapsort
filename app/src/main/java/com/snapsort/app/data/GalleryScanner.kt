@@ -49,6 +49,41 @@ internal class GalleryScanner(private val context: Context) {
             } } ?: emptyList()
     }
 
+    /** Walk a user-granted tree without copying bytes. Cancellation is checked between rows. */
+    suspend fun folderImages(tree: Uri, onImage: suspend (StoredImage) -> Unit) {
+        require(DocumentsContract.isTreeUri(tree)) { "Choose a folder through Android's folder picker" }
+        val pending = ArrayDeque<String>()
+        val visited = hashSetOf<String>()
+        pending.add(DocumentsContract.getTreeDocumentId(tree))
+        while (pending.isNotEmpty()) {
+            currentCoroutineContext().ensureActive()
+            val parent = pending.removeFirst()
+            if (!visited.add(parent)) continue
+            val children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, parent)
+            val documents: List<Pair<String, String?>> = resolver.query(children, arrayOf(
+                DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_MIME_TYPE,
+            ), null, null, null)?.use { c ->
+                buildList<Pair<String, String?>> {
+                    while (c.moveToNext()) {
+                        currentCoroutineContext().ensureActive()
+                        add(c.getString(0) to c.getString(1))
+                    }
+                }
+            } ?: throw java.io.IOException("The selected folder is unavailable")
+            for ((id, mime) in documents) {
+                currentCoroutineContext().ensureActive()
+                if (mime == DocumentsContract.Document.MIME_TYPE_DIR) pending.add(id)
+                else if (mime?.startsWith("image/") == true) {
+                    val original = DocumentsContract.buildDocumentUriUsingTree(tree, id)
+                    val resolved = resolvePickedUri(original)
+                    val row = runCatching { readSingle(resolved) }.getOrNull()
+                        ?: if (resolved != original) runCatching { readSingle(original) }.getOrNull() else null
+                    if (row != null) onImage(row.copy(image = row.image.copy(manuallyAdded = true)))
+                }
+            }
+        }
+    }
+
     fun resolvePickedUri(uri: Uri): Uri {
         return runCatching { MediaStore.getMediaUri(context, uri) }.getOrNull() ?: uri
     }

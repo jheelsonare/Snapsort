@@ -4,6 +4,15 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+// Signing values come from a local shell or GitHub environment secrets, never source control.
+val releaseSigningValues = listOf(
+    "SNAPSORT_KEYSTORE_FILE", "SNAPSORT_KEYSTORE_PASSWORD", "SNAPSORT_KEY_ALIAS", "SNAPSORT_KEY_PASSWORD",
+).associateWith { providers.environmentVariable(it).orNull }
+val hasReleaseSigning = releaseSigningValues.values.all { !it.isNullOrBlank() }
+require(hasReleaseSigning || releaseSigningValues.values.all { it.isNullOrBlank() }) {
+    "Provide all four SNAPSORT release signing variables, or none for an unsigned local release."
+}
+
 android {
     namespace = "com.snapsort.app"
     compileSdk = 35
@@ -12,10 +21,20 @@ android {
         applicationId = "com.snapsort.app"
         minSdk = 30
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
+    }
+    if (hasReleaseSigning) {
+        signingConfigs.create("release") {
+            storeFile = file(releaseSigningValues.getValue("SNAPSORT_KEYSTORE_FILE")!!)
+            require(storeFile!!.isFile) { "The configured release keystore file does not exist." }
+            storePassword = releaseSigningValues.getValue("SNAPSORT_KEYSTORE_PASSWORD")
+            keyAlias = releaseSigningValues.getValue("SNAPSORT_KEY_ALIAS")
+            keyPassword = releaseSigningValues.getValue("SNAPSORT_KEY_PASSWORD")
+        }
+        buildTypes.getByName("release").signingConfig = signingConfigs.getByName("release")
     }
     buildFeatures { compose = true; buildConfig = true }
     compileOptions {

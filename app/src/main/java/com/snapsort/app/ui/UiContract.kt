@@ -18,6 +18,7 @@ data class AppUiState(
     val duplicateCount: Int = 0,
     val duplicateGroupSizes: Map<Pair<String?, Long>, Int> = emptyMap(),
     val busyDeleting: Boolean = false,
+    val cleanupRecoveryPending: Boolean = false,
     val message: String? = null,
 )
 
@@ -25,6 +26,8 @@ sealed interface AppAction {
     data object RequestAccess : AppAction
     data object ManageAccess : AppAction
     data object AddImages : AppAction
+    data object AddFolder : AppAction
+    data object RestoreExcluded : AppAction
     data object Refresh : AppAction
     data class ChangeCollection(val value: ReviewCollection) : AppAction
     data class FilterCategory(val value: Category?) : AppAction
@@ -39,6 +42,11 @@ sealed interface AppAction {
     data class CorrectCategory(val category: Category) : AppAction
     data class SetItemKeep(val uri: String, val keep: Boolean) : AppAction
     data class SetItemCategory(val uri: String, val category: Category) : AppAction
+    data class ResetItemCategory(val uri: String) : AppAction
+    data class ExcludeItem(val uri: String) : AppAction
+    data class RetryIndex(val uri: String? = null) : AppAction
+    data object SelectSupportedGalleryImages : AppAction
+    data object DiscardRecoveredTrash : AppAction
     data object DeleteSelected : AppAction
     data object RemoveSelectedFromCollection : AppAction
     data object DismissMessage : AppAction

@@ -19,6 +19,8 @@ import androidx.activity.viewModels
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.getValue
 import com.snapsort.app.domain.GalleryAccess
 import com.snapsort.app.ui.AppAction
@@ -40,7 +42,17 @@ class MainActivity : ComponentActivity() {
         if (uris.isNotEmpty()) model.addImages(uris)
     }
     private val trashConfirmation = registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
-        model.trashResult(result.resultCode == Activity.RESULT_OK)?.let(::launchTrash)
+        model.onTrashResult(result.resultCode == Activity.RESULT_OK)
+    }
+    private val folderPicker = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri != null) {
+            try {
+                contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                model.addFolder(uri)
+            } catch (_: SecurityException) {
+                model.notify("This provider cannot retain folder access. Select individual images instead.")
+            }
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -59,7 +71,8 @@ class MainActivity : ComponentActivity() {
                         else startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, "package:$packageName".toUri()))
                     }
                     AppAction.AddImages -> imagePicker.launch(arrayOf("image/*"))
-                    AppAction.DeleteSelected -> model.beginTrash()?.let(::launchTrash)
+                    AppAction.AddFolder -> folderPicker.launch(null)
+                    AppAction.DeleteSelected -> lifecycleScope.launch { model.beginTrash()?.let(::launchTrash) }
                     else -> model.action(action)
                 }
             }
@@ -95,11 +108,11 @@ class MainActivity : ComponentActivity() {
             val request = MediaStore.createTrashRequest(contentResolver, uris.map(Uri::parse), true)
             trashConfirmation.launch(IntentSenderRequest.Builder(request.intentSender).build())
         } catch (_: SecurityException) {
-            model.trashFailed("Android could not access one of the selected originals. Review gallery access, then try again.")
+            model.onTrashFailed("Android could not access one of the selected originals. Review gallery access, then try again.")
         } catch (_: IllegalArgumentException) {
-            model.trashFailed("One of these images cannot use Android's trash flow. Refresh and review the selection again.")
+            model.onTrashFailed("One of these images cannot use Android's trash flow. Refresh and review the selection again.")
         } catch (_: android.content.ActivityNotFoundException) {
-            model.trashFailed("Android's trash confirmation is unavailable. The collection is being refreshed.")
+            model.onTrashFailed("Android's trash confirmation is unavailable. The collection is being refreshed.")
         }
     }
 }

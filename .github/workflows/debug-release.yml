@@ -1,0 +1,105 @@
+name: Publish verified debug APK
+
+on:
+  push:
+    tags: ['debug-v*']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: debug-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish-tested-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Install signature and manifest verification tools
+        run: sdkmanager 'build-tools;35.0.0'
+      - name: Verify exact tested archive and APK
+        run: |
+          python3 - <<'PY'
+          import hashlib, os, re, shutil, zipfile
+          from pathlib import Path
+
+          tag = os.environ['GITHUB_REF_NAME']
+          if not re.fullmatch(r'debug-v[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?', tag):
+              raise SystemExit('Expected a debug-v<version> tag; no release will be published.')
+          expected = {}
+          for line in Path('downloads/SHA256SUMS').read_text().splitlines():
+              fields = line.split()
+              if len(fields) != 2 or not re.fullmatch(r'[0-9a-f]{64}', fields[0]):
+                  raise SystemExit('Malformed checksum manifest; no release will be published.')
+              digest, name = fields
+              if name not in ('SnapSort-download.zip', 'SnapSort-debug.apk') or name in expected:
+                  raise SystemExit('Unexpected or duplicate checksum entry; no release will be published.')
+              expected[name] = digest
+          if set(expected) != {'SnapSort-download.zip', 'SnapSort-debug.apk'}:
+              raise SystemExit('Both ZIP and APK checksums are required.')
+
+          def sha(path):
+              value = hashlib.sha256()
+              with path.open('rb') as stream:
+                  for block in iter(lambda: stream.read(1024 * 1024), b''):
+                      value.update(block)
+              return value.hexdigest()
+
+          archive = Path('downloads/SnapSort-download.zip')
+          if sha(archive) != expected[archive.name]:
+              raise SystemExit('ZIP checksum mismatch; no release will be published.')
+          output = Path('release-assets')
+          output.mkdir()
+          apk = output / f'SnapSort-{tag}.apk'
+          with zipfile.ZipFile(archive) as bundle:
+              if bundle.namelist() != ['SnapSort-debug.apk']:
+                  raise SystemExit('Archive must contain exactly SnapSort-debug.apk.')
+              # Reading the complete member verifies its ZIP CRC as well as the SHA256 below.
+              with bundle.open('SnapSort-debug.apk') as source, apk.open('wb') as target:
+                  shutil.copyfileobj(source, target)
+          if sha(apk) != expected['SnapSort-debug.apk']:
+              raise SystemExit('APK checksum mismatch; no release will be published.')
+          (output / 'SHA256SUMS').write_text(f"{expected['SnapSort-debug.apk']}  {apk.name}\n")
+          print('ZIP CRC and ZIP/APK SHA256 verified; APK bytes are unchanged.')
+          PY
+      - name: Verify signature, package, debug flag, and tagged version
+        run: |
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "release-assets/SnapSort-${GITHUB_REF_NAME}.apk"
+          python3 - <<'PY'
+          import os, re, subprocess
+          from pathlib import Path
+          tag = os.environ['GITHUB_REF_NAME']
+          apk = Path('release-assets') / f'SnapSort-{tag}.apk'
+          aapt = Path(os.environ['ANDROID_HOME']) / 'build-tools/35.0.0/aapt'
+          badging = subprocess.check_output([str(aapt), 'dump', 'badging', str(apk)], text=True)
+          package = re.search(r"^package: name='([^']+)'", badging, re.MULTILINE)
+          version = re.search(r"versionName='([^']+)'", badging)
+          if not package or package.group(1) != 'com.snapsort.app':
+              raise SystemExit('Unexpected application ID; no release will be published.')
+          if not version or tag != f'debug-v{version.group(1)}':
+              raise SystemExit('Tag must match the embedded APK versionName; no release will be published.')
+          if not re.search(r'^application-debuggable\s*$', badging, re.MULTILINE):
+              raise SystemExit('Expected the locally tested debug APK, not a production release.')
+          Path('release-notes.md').write_text(
+              f"Debug prerelease for local testing, from commit {os.environ['GITHUB_SHA']}.\n\n"
+              'This APK uses the development debug signing identity. It is not a production-signed release. '
+              'The workflow verified and extracted the committed, locally tested ZIP; it did not rebuild or re-sign the APK. '
+              'See VALIDATION.md at this tag for exact test coverage and remaining device limitations.\n\n'
+              'Requires Android 11 or newer. Download the APK and compare its SHA256 with SHA256SUMS. '
+              'Updates require the same signing certificate as your installed app. '
+              'Uninstalling SnapSort removes its local OCR, category, and Keep metadata; gallery originals remain on the phone.\n'
+          )
+          print('APK signature, package, debug flag, and tagged version verified.')
+          PY
+      - name: Publish versioned debug prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" release-assets/*.apk release-assets/SHA256SUMS --verify-tag --prerelease --title "SnapSort $GITHUB_REF_NAME (debug)" --notes-file release-notes.md

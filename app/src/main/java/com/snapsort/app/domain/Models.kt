@@ -8,6 +8,8 @@ enum class ReviewCollection(val label: String) {
     ALL("All screenshots"), DUPLICATES("Exact duplicates"), OLDER("Older screenshots"), LARGE("Large screenshots")
 }
 
+enum class IndexStatus { PENDING, RUNNING, SUCCEEDED, FAILED }
+
 data class Screenshot(
     val uri: String,
     val name: String,
@@ -21,7 +23,14 @@ data class Screenshot(
     val indexed: Boolean = false,
     val manuallyAdded: Boolean = false,
     val canDelete: Boolean = true,
-)
+    val hashStatus: IndexStatus = if (hash != null) IndexStatus.SUCCEEDED else IndexStatus.PENDING,
+    val ocrStatus: IndexStatus = if (indexed) IndexStatus.SUCCEEDED else IndexStatus.PENDING,
+    val hashError: String? = null,
+    val ocrError: String? = null,
+) {
+    val needsIndexing: Boolean get() = hashStatus == IndexStatus.PENDING || ocrStatus == IndexStatus.PENDING
+    val hasIndexFailure: Boolean get() = hashStatus == IndexStatus.FAILED || ocrStatus == IndexStatus.FAILED
+}
 
 data class GalleryAccess(val canReadLibrary: Boolean = false, val limited: Boolean = false)
 
@@ -32,4 +41,6 @@ data class LibraryState(
     val processed: Int = 0,
     val totalToProcess: Int = 0,
     val error: String? = null,
-)
+) {
+    val failedCount: Int get() = items.count { it.hasIndexFailure }
+}

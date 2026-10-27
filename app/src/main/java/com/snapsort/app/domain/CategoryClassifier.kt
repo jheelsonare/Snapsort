@@ -42,22 +42,40 @@ object CategoryClassifier {
         ),
     )
 
-    fun classify(text: String, name: String): Category {
-        val normalized = normalize("$name $text")
-        if (normalized.isBlank()) return Category.OTHER
-        val padded = " $normalized "
-        var best = Category.OTHER
-        var bestScore = 0
-        for ((category, words) in signals) {
-            val score = words.sumOf { signal ->
-                if (padded.contains(" ${signal.phrase} ")) signal.weight else 0
-            }
-            if (score > bestScore) {
-                best = category
-                bestScore = score
-            }
-        }
-        return best
+    /** Raw rule evidence, not a calibrated probability of correctness. */
+    data class Suggestion(
+        val category: Category,
+        val leadingCategory: Category,
+        val score: Int,
+        val margin: Int,
+        val evidence: List<String>,
+    ) {
+        val needsReview: Boolean get() = category == Category.OTHER
+    }
+
+    // A weak word such as "seat", "chapter", or "discount" cannot establish a category.
+    // Close winners are deliberately left for review, rather than resolved by enum order.
+    private const val MIN_SCORE = 4
+    private const val MIN_MARGIN = 2
+
+    fun classify(text: String, name: String): Category = suggest(text, name).category
+
+    fun suggest(text: String, name: String): Suggestion {
+        val padded = " ${normalize("$name $text")} "
+        val ranked = signals.map { (category, words) ->
+            val matched = words.filter { padded.contains(" ${it.phrase} ") }
+            Triple(category, matched.sumOf { it.weight }, matched.map { it.phrase })
+        }.sortedByDescending { it.second }
+        val first = ranked.first()
+        val margin = first.second - ranked[1].second
+        val accepted = first.second >= MIN_SCORE && margin >= MIN_MARGIN
+        return Suggestion(
+            category = if (accepted) first.first else Category.OTHER,
+            leadingCategory = if (first.second > 0) first.first else Category.OTHER,
+            score = first.second,
+            margin = margin,
+            evidence = first.third,
+        )
     }
 
     private fun normalize(value: String): String = Normalizer.normalize(value, Normalizer.Form.NFKD)

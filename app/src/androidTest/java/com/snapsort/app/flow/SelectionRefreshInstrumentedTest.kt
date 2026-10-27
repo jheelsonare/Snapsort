@@ -59,11 +59,9 @@ class SelectionRefreshInstrumentedTest {
             await { model.state.value.library.items.any { it.uri == uri.toString() } }
             instrumentation.runOnMainSync { model.action(AppAction.ToggleSelection(uri.toString())) }
             await { uri.toString() in model.state.value.selected }
-            instrumentation.runOnMainSync {
-                assertEquals(listOf(uri.toString()), model.beginTrash())
-                assertNull("Repeated confirmation must not enqueue the same originals", model.beginTrash())
-                model.trashResult(false)
-            }
+            assertEquals(listOf(uri.toString()), model.beginTrash())
+            assertNull("Repeated confirmation must not enqueue the same originals", model.beginTrash())
+            model.trashResult(false)
             await { !model.state.value.busyDeleting }
             // Provider writes simulate changes made by the gallery, bypassing SnapSort's commands.
             assertEquals(1, resolver.update(uri, ContentValues().apply { put(MediaStore.Images.Media.IS_TRASHED, 1) }, null, null))

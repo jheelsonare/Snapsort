@@ -1,0 +1,46 @@
+{
+  "kind": "host-jvm-synthetic-metadata",
+  "measured_at": "2026-10-27T04:57:53.707675396Z",
+  "java": "21.0.9+10-LTS",
+  "os": "Linux amd64",
+  "available_processors": 5,
+  "warmups": 5,
+  "samples_per_operation": 20,
+  "limitations": "No Android UI, gallery I/O, image decode, OCR, battery or device-memory measurement. Heap and allocation values are host JVM estimates.",
+  "libraries": [
+    {
+      "items": 1000,
+      "fixture": "30 percent in exact-copy groups of three, 70 percent unique; deterministic dates, OCR text, categories and Keep flags",
+      "approximate_retained_fixture_and_summary_heap_bytes": 832608,
+      "operations": [
+        {"operation": "browse_by_date", "median_ms": 0.500726, "p95_ms": 6.617766, "mean_thread_allocated_bytes": 86837, "result_checksum": 1000},
+        {"operation": "search_ocr_two_words", "median_ms": 4.885219, "p95_ms": 28.312783, "mean_thread_allocated_bytes": 1177760, "result_checksum": 167},
+        {"operation": "older_90_days", "median_ms": 0.323659, "p95_ms": 4.405104, "mean_thread_allocated_bytes": 182248, "result_checksum": 823},
+        {"operation": "large_by_bytes", "median_ms": 0.657233, "p95_ms": 4.982897, "mean_thread_allocated_bytes": 442608, "result_checksum": 941},
+        {"operation": "exact_duplicate_view", "median_ms": 1.485934, "p95_ms": 3.48909, "mean_thread_allocated_bytes": 445120, "result_checksum": 282},
+        {"operation": "select_duplicate_extras", "median_ms": 0.518223, "p95_ms": 0.704875, "mean_thread_allocated_bytes": 389544, "result_checksum": 200},
+        {"operation": "selected_byte_estimate", "median_ms": 0.235505, "p95_ms": 0.367665, "mean_thread_allocated_bytes": 65128, "result_checksum": 257500000},
+        {"operation": "duplicate_summary_rebuild", "median_ms": 1.116626, "p95_ms": 3.678647, "mean_thread_allocated_bytes": 527785, "result_checksum": 200},
+        {"operation": "derive_duplicate_view_uncached", "median_ms": 2.08525, "p95_ms": 5.46187, "mean_thread_allocated_bytes": 1249104, "result_checksum": 3179000682},
+        {"operation": "derive_duplicate_view_reused_summary", "median_ms": 0.39736, "p95_ms": 0.510261, "mean_thread_allocated_bytes": 101504, "result_checksum": 3179000682}
+      ]
+    },
+    {
+      "items": 10000,
+      "fixture": "30 percent in exact-copy groups of three, 70 percent unique; deterministic dates, OCR text, categories and Keep flags",
+      "approximate_retained_fixture_and_summary_heap_bytes": 12008688,
+      "operations": [
+        {"operation": "browse_by_date", "median_ms": 12.531429, "p95_ms": 25.359546, "mean_thread_allocated_bytes": 882352, "result_checksum": 10000},
+        {"operation": "search_ocr_two_words", "median_ms": 18.704483, "p95_ms": 40.907041, "mean_thread_allocated_bytes": 11526753, "result_checksum": 1667},
+        {"operation": "older_90_days", "median_ms": 5.947334, "p95_ms": 25.088987, "mean_thread_allocated_bytes": 5135808, "result_checksum": 8238},
+        {"operation": "large_by_bytes", "median_ms": 5.188448, "p95_ms": 10.384066, "mean_thread_allocated_bytes": 4577264, "result_checksum": 9411},
+        {"operation": "exact_duplicate_view", "median_ms": 5.716906, "p95_ms": 23.356991, "mean_thread_allocated_bytes": 5774064, "result_checksum": 2823},
+        {"operation": "select_duplicate_extras", "median_ms": 3.806299, "p95_ms": 7.054406, "mean_thread_allocated_bytes": 4016832, "result_checksum": 2000},
+        {"operation": "selected_byte_estimate", "median_ms": 1.04584, "p95_ms": 2.517413, "mean_thread_allocated_bytes": 635432, "result_checksum": 2995000000},
+        {"operation": "duplicate_summary_rebuild", "median_ms": 7.465657, "p95_ms": 24.283516, "mean_thread_allocated_bytes": 5347344, "result_checksum": 2000},
+        {"operation": "derive_duplicate_view_uncached", "median_ms": 24.709322, "p95_ms": 53.293557, "mean_thread_allocated_bytes": 14295801, "result_checksum": 33974006823},
+        {"operation": "derive_duplicate_view_reused_summary", "median_ms": 3.563974, "p95_ms": 6.298554, "mean_thread_allocated_bytes": 1031504, "result_checksum": 33974006823}
+      ]
+    }
+  ]
+}

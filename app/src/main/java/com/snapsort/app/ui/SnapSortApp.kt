@@ -41,6 +41,7 @@ import coil.request.ImageRequest
 import com.snapsort.app.domain.Category
 import com.snapsort.app.domain.ReviewCollection
 import com.snapsort.app.domain.Screenshot
+import com.snapsort.app.domain.IndexStatus
 import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
@@ -50,7 +51,14 @@ import java.util.Locale
 fun SnapSortApp(state: AppUiState, onAction: (AppAction) -> Unit) {
     var reviewOpen by remember { mutableStateOf(false) }
     var previewUri by remember { mutableStateOf<String?>(null) }
-    val preview = state.library.items.firstOrNull { it.uri == previewUri }
+    var viewerQueue by remember { mutableStateOf<List<String>>(emptyList()) }
+    var sequentialReview by remember { mutableStateOf(false) }
+    fun openViewer(uri: String, sequential: Boolean = false) {
+        viewerQueue = state.visible.map { it.uri }
+        previewUri = uri
+        sequentialReview = sequential
+    }
+    LaunchedEffect(state.selected.isEmpty()) { if (state.selected.isEmpty()) reviewOpen = false }
     SnapSortTheme {
         Scaffold(
             topBar = { BrandBar(state, onAction) },
@@ -77,8 +85,37 @@ fun SnapSortApp(state: AppUiState, onAction: (AppAction) -> Unit) {
                         Notice(notice) { onAction(AppAction.DismissMessage) }
                     }
                 }
+                if (state.cleanupRecoveryPending) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        OutlinedCard {
+                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text("Cleanup interrupted", style = MaterialTheme.typography.titleMedium)
+                                Text("An earlier cleanup did not finish. Only accessible remaining images can be selected. Review before starting another Android confirmation.", color = Muted)
+                                TextButton(onClick = { onAction(AppAction.DiscardRecoveredTrash) }) { Text("Discard recovered selection") }
+                            }
+                        }
+                    }
+                }
                 item(span = { GridItemSpan(maxLineSpan) }) { Collections(state, onAction) }
                 item(span = { GridItemSpan(maxLineSpan) }) { LibraryControls(state, onAction) }
+                if (state.visible.isNotEmpty()) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        FilledTonalButton(onClick = { openViewer(state.visible.first().uri, sequential = true) },
+                            enabled = !state.busyDeleting, modifier = Modifier.fillMaxWidth()) {
+                            Text("Review screenshots")
+                        }
+                    }
+                }
+                val failedCount = state.library.items.count { it.hashStatus == IndexStatus.FAILED || it.ocrStatus == IndexStatus.FAILED }
+                if (failedCount > 0) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        Column {
+                            Text("$failedCount screenshot(s) have failed indexing. Successful file hashes still contribute to duplicate groups.",
+                                color = Muted, style = MaterialTheme.typography.bodySmall)
+                            TextButton(onClick = { onAction(AppAction.RetryIndex()) }) { Text("Retry failed items") }
+                        }
+                    }
+                }
                 if (state.library.processing || state.library.loading) {
                     item(span = { GridItemSpan(maxLineSpan) }) {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -108,7 +145,7 @@ fun SnapSortApp(state: AppUiState, onAction: (AppAction) -> Unit) {
                         }
                         items(group.value, key = { it.uri }) { shot ->
                             ScreenshotTile(shot, shot.uri in state.selected,
-                                { onAction(AppAction.ToggleSelection(shot.uri)) }, { previewUri = shot.uri })
+                                { onAction(AppAction.ToggleSelection(shot.uri)) }, { openViewer(shot.uri) })
                         }
                     }
                 } else {
@@ -117,7 +154,7 @@ fun SnapSortApp(state: AppUiState, onAction: (AppAction) -> Unit) {
                             shot = shot,
                             selected = shot.uri in state.selected,
                             select = { onAction(AppAction.ToggleSelection(shot.uri)) },
-                            preview = { previewUri = shot.uri },
+                            preview = { openViewer(shot.uri) },
                         )
                     }
                 }
@@ -139,18 +176,17 @@ fun SnapSortApp(state: AppUiState, onAction: (AppAction) -> Unit) {
             }, onRemove = {
                 reviewOpen = false
                 onAction(AppAction.RemoveSelectedFromCollection)
-            })
+            }, onAction = onAction)
         }
-        if (preview != null) {
-            PreviewSheet(preview, preview.uri in state.selected, { previewUri = null }, {
-                onAction(AppAction.ToggleSelection(preview.uri))
-            }, onAction)
+        previewUri?.let { initial ->
+            ScreenshotViewer(state, viewerQueue, initial, sequentialReview, { previewUri = null }, onAction)
         }
     }
 }
 
 @Composable
 private fun BrandBar(state: AppUiState, onAction: (AppAction) -> Unit) {
+    var more by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(start = 20.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -166,8 +202,19 @@ private fun BrandBar(state: AppUiState, onAction: (AppAction) -> Unit) {
         IconButton(onClick = { onAction(AppAction.Refresh) }, enabled = !state.library.loading) {
             Icon(Icons.Outlined.Refresh, "Refresh gallery")
         }
-        IconButton(onClick = { onAction(AppAction.ManageAccess) }) {
-            Icon(Icons.Outlined.Settings, "Gallery access settings")
+        Box {
+            IconButton(onClick = { more = true }) { Icon(Icons.Outlined.MoreVert, "More gallery options") }
+            DropdownMenu(expanded = more, onDismissRequest = { more = false }) {
+                DropdownMenuItem(text = { Text("Gallery access settings") }, onClick = {
+                    more = false; onAction(AppAction.ManageAccess)
+                })
+                DropdownMenuItem(text = { Text("Choose additional folder") }, onClick = {
+                    more = false; onAction(AppAction.AddFolder)
+                })
+                DropdownMenuItem(text = { Text("Restore excluded screenshots") }, onClick = {
+                    more = false; onAction(AppAction.RestoreExcluded)
+                })
+            }
         }
     }
 }
@@ -287,7 +334,7 @@ private fun LibraryControls(state: AppUiState, onAction: (AppAction) -> Unit) {
             items(Category.entries) { category ->
                 FilterChip(selected = state.category == category,
                     onClick = { onAction(AppAction.FilterCategory(if (state.category == category) null else category)) },
-                    label = { Text(category.label) })
+                    label = { Text(if (category == Category.OTHER) "Other / needs review" else category.label) })
             }
         }
         if (state.collection == ReviewCollection.OLDER) {
@@ -435,7 +482,8 @@ private fun SelectionBar(state: AppUiState, onAction: (AppAction) -> Unit, revie
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ReviewSheet(state: AppUiState, onDismiss: () -> Unit, onConfirm: () -> Unit, onRemove: () -> Unit) {
+private fun ReviewSheet(state: AppUiState, onDismiss: () -> Unit, onConfirm: () -> Unit, onRemove: () -> Unit,
+    onAction: (AppAction) -> Unit) {
     val canDelete = state.selectedItems.all { it.canDelete }
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -460,6 +508,9 @@ private fun ReviewSheet(state: AppUiState, onDismiss: () -> Unit, onConfirm: () 
                             if (!shot.canDelete) Text("Manage this original in its image provider",
                                 color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
                         }
+                        IconButton(onClick = { onAction(AppAction.ToggleSelection(shot.uri)) }, enabled = !state.busyDeleting) {
+                            Icon(Icons.Outlined.Close, "Remove ${shot.name} from trash selection")
+                        }
                     }
                 }
             }
@@ -467,7 +518,12 @@ private fun ReviewSheet(state: AppUiState, onDismiss: () -> Unit, onConfirm: () 
                 Text("Some selected images are shared by a document provider. Android doesn't expose a supported gallery deletion flow for them here. Delete those originals in your gallery or select only supported gallery images.",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
             }
-            Button(onClick = onConfirm, enabled = canDelete && !state.busyDeleting, modifier = Modifier.fillMaxWidth()) {
+            if (!canDelete && state.selectedItems.any { it.canDelete }) {
+                OutlinedButton(onClick = { onAction(AppAction.SelectSupportedGalleryImages) }, modifier = Modifier.fillMaxWidth()) {
+                    Text("Select supported gallery images")
+                }
+            }
+            Button(onClick = onConfirm, enabled = canDelete && state.selectedItems.isNotEmpty() && !state.busyDeleting, modifier = Modifier.fillMaxWidth()) {
                 Text("Continue to Android · move to trash")
             }
             if (state.selectedItems.all { it.manuallyAdded }) {
@@ -475,55 +531,6 @@ private fun ReviewSheet(state: AppUiState, onDismiss: () -> Unit, onConfirm: () 
                 Text("Removing from SnapSort leaves the original gallery images untouched.", style = MaterialTheme.typography.bodySmall, color = Muted)
             }
             TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) { Text("Keep reviewing") }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun PreviewSheet(shot: Screenshot, selected: Boolean, onDismiss: () -> Unit, onSelect: () -> Unit, onAction: (AppAction) -> Unit) {
-    var categoryMenu by remember { mutableStateOf(false) }
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
-        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp).padding(bottom = 28.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Screenshot", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                IconButton(onClick = onDismiss) { Icon(Icons.Outlined.Close, "Close preview") }
-            }
-            AsyncImage(shot.uri, "Full preview of ${shot.name}", contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 180.dp, max = 410.dp).clip(RoundedCornerShape(16.dp)).background(Panel))
-            Text(shot.name, style = MaterialTheme.typography.bodyMedium)
-            Text("${formatDate(shot.dateMillis)} · ${formatBytes(shot.sizeBytes)}", style = MaterialTheme.typography.bodySmall, color = Muted)
-            if (!shot.canDelete) Text("This provider allows viewing. Manage or delete the original in its gallery; SnapSort can remove it from this collection only.",
-                style = MaterialTheme.typography.bodySmall, color = Muted)
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box {
-                    AssistChip(onClick = { categoryMenu = true }, label = { Text(shot.category.label) },
-                        leadingIcon = { Icon(Icons.AutoMirrored.Outlined.Label, null, Modifier.size(18.dp)) })
-                    DropdownMenu(expanded = categoryMenu, onDismissRequest = { categoryMenu = false }) {
-                        Category.entries.forEach { category ->
-                            DropdownMenuItem(text = { Text(category.label) }, onClick = {
-                                categoryMenu = false
-                                onAction(AppAction.SetItemCategory(shot.uri, category))
-                            })
-                        }
-                    }
-                }
-                FilterChip(selected = shot.keep, onClick = { onAction(AppAction.SetItemKeep(shot.uri, !shot.keep)) },
-                    label = { Text("Keep") }, leadingIcon = { Icon(Icons.Outlined.Bookmark, null, Modifier.size(18.dp)) })
-                Spacer(Modifier.weight(1f))
-                Checkbox(checked = selected, onCheckedChange = { onSelect() }, modifier = Modifier.semantics { contentDescription = "Select this screenshot" })
-            }
-            Text(if (shot.categoryCorrected) "Category chosen by you" else "Suggested category · tap to correct",
-                style = MaterialTheme.typography.bodySmall, color = Muted)
-            HorizontalDivider(color = Muted.copy(alpha = .2f))
-            Text("Text found on device", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-            SelectionContainer {
-                Text(shot.text.ifBlank { if (shot.indexed) "No readable text found." else "Text recognition is still processing this image." },
-                    color = Muted, style = MaterialTheme.typography.bodyMedium)
-            }
-            Text("Keep excludes this image from bulk cleanup suggestions. You can still select it individually.",
-                style = MaterialTheme.typography.bodySmall, color = Muted)
         }
     }
 }

@@ -335,6 +335,31 @@ class Smoke:
             raise RuntimeError(f"Full access should expose both seeded originals, saw {visible}")
         self.report["scenarios"].append({"name": "full", "status": "passed", "permissions": state, "visible_fixtures": visible})
 
+    def revoked(self):
+        # Start with a real system-dialog grant and a populated collection. Unlike reset(),
+        # revoke access in place, preserving app metadata and the original gallery fixtures.
+        self.full()
+        before = self.report["scenarios"].pop()
+        self.stage = "revoked"
+        for permission in (IMAGES, SELECTED):
+            self.shell("pm", "revoke", PACKAGE, permission)
+        self.shell("am", "start", "-W", "-n", f"{PACKAGE}/.MainActivity")
+        self.wait_node(texts=("Allow access",), label="revoked-recovery", timeout=60)
+        after = self.permission_state()
+        if any(after.values()):
+            raise RuntimeError(f"Runtime revocation did not take effect: {after}")
+        visible = self.visible_fixtures()
+        if visible:
+            raise RuntimeError(f"Revoked gallery originals must not remain visible: {visible}")
+        for name in self.names:
+            result = self.shell("content", "query", "--uri", "content://media/external/images/media",
+                                "--projection", "_display_name", "--where",
+                                f"_display_name='{name}' AND relative_path='{self.relative}'")
+            if name not in result:
+                raise RuntimeError("A permission revocation fixture unexpectedly disappeared from MediaStore")
+        self.report["scenarios"].append({"name": "revoked", "status": "passed", "permissions_before": before["permissions"],
+                                         "permissions": after, "visible_fixtures": [], "originals_still_in_gallery": True})
+
     def cleanup(self):
         # Exact generated names + relative paths protect all pre-existing media.
         errors = []
@@ -379,8 +404,8 @@ def main() -> int:
     parser.add_argument("--reset-test-app", action="store_true", help="Required: authorise clearing SnapSort metadata on this test device")
     parser.add_argument("--serial", help="adb device serial, e.g. emulator-5554")
     parser.add_argument("--output-dir", help="Store JSON/UI XML evidence here")
-    parser.add_argument("--scenarios", nargs="+", choices=("denied", "limited", "full"),
-                        default=["denied", "limited", "full"], help="Run selected scenarios; default is all three")
+    parser.add_argument("--scenarios", nargs="+", choices=("denied", "limited", "full", "revoked"),
+                        default=["denied", "limited", "full", "revoked"], help="Run selected scenarios; default includes in-place revocation after a real full grant")
     args = parser.parse_args()
     if not args.reset_test_app:
         parser.error("--reset-test-app is required because these tests clear local SnapSort metadata; use only a disposable test device")

@@ -1,0 +1,46 @@
+{
+  "kind": "host-jvm-synthetic-metadata",
+  "measured_at": "2026-10-27T04:54:40.618490925Z",
+  "java": "21.0.9+10-LTS",
+  "os": "Linux amd64",
+  "available_processors": 5,
+  "warmups": 5,
+  "samples_per_operation": 20,
+  "limitations": "No Android UI, gallery I/O, image decode, OCR, battery or device-memory measurement. Heap and allocation values are host JVM estimates.",
+  "libraries": [
+    {
+      "items": 1000,
+      "fixture": "30 percent in exact-copy groups of three, 70 percent unique; deterministic dates, OCR text, categories and Keep flags",
+      "approximate_retained_fixture_and_summary_heap_bytes": 869928,
+      "operations": [
+        {"operation": "browse_by_date", "median_ms": 1.603391, "p95_ms": 2.039179, "mean_thread_allocated_bytes": 480197, "result_checksum": 1000},
+        {"operation": "search_ocr_two_words", "median_ms": 1.795582, "p95_ms": 4.710414, "mean_thread_allocated_bytes": 1177808, "result_checksum": 167},
+        {"operation": "older_90_days", "median_ms": 0.228955, "p95_ms": 0.482008, "mean_thread_allocated_bytes": 236920, "result_checksum": 823},
+        {"operation": "large_by_bytes", "median_ms": 0.526045, "p95_ms": 0.707569, "mean_thread_allocated_bytes": 487704, "result_checksum": 941},
+        {"operation": "exact_duplicate_view", "median_ms": 1.009675, "p95_ms": 1.686837, "mean_thread_allocated_bytes": 488200, "result_checksum": 282},
+        {"operation": "select_duplicate_extras", "median_ms": 0.4503, "p95_ms": 1.619176, "mean_thread_allocated_bytes": 389544, "result_checksum": 200},
+        {"operation": "selected_byte_estimate", "median_ms": 0.326803, "p95_ms": 0.362037, "mean_thread_allocated_bytes": 65128, "result_checksum": 257500000},
+        {"operation": "duplicate_summary_rebuild", "median_ms": 1.766969, "p95_ms": 2.867931, "mean_thread_allocated_bytes": 517000, "result_checksum": 200},
+        {"operation": "derive_duplicate_view_uncached", "median_ms": 2.996185, "p95_ms": 4.643623, "mean_thread_allocated_bytes": 1122368, "result_checksum": 3179001382},
+        {"operation": "derive_duplicate_view_reused_summary", "median_ms": 0.728951, "p95_ms": 1.367535, "mean_thread_allocated_bytes": 184256, "result_checksum": 3179001382}
+      ]
+    },
+    {
+      "items": 10000,
+      "fixture": "30 percent in exact-copy groups of three, 70 percent unique; deterministic dates, OCR text, categories and Keep flags",
+      "approximate_retained_fixture_and_summary_heap_bytes": 12250408,
+      "operations": [
+        {"operation": "browse_by_date", "median_ms": 32.023114, "p95_ms": 61.376775, "mean_thread_allocated_bytes": 4314743, "result_checksum": 10000},
+        {"operation": "search_ocr_two_words", "median_ms": 28.02865, "p95_ms": 51.592845, "mean_thread_allocated_bytes": 11894744, "result_checksum": 1667},
+        {"operation": "older_90_days", "median_ms": 2.364663, "p95_ms": 3.305032, "mean_thread_allocated_bytes": 4558696, "result_checksum": 8238},
+        {"operation": "large_by_bytes", "median_ms": 4.193344, "p95_ms": 24.979534, "mean_thread_allocated_bytes": 4577232, "result_checksum": 9411},
+        {"operation": "exact_duplicate_view", "median_ms": 23.491857, "p95_ms": 49.214632, "mean_thread_allocated_bytes": 5460220, "result_checksum": 2823},
+        {"operation": "select_duplicate_extras", "median_ms": 13.515076, "p95_ms": 32.873353, "mean_thread_allocated_bytes": 4016116, "result_checksum": 2000},
+        {"operation": "selected_byte_estimate", "median_ms": 1.257189, "p95_ms": 5.751778, "mean_thread_allocated_bytes": 635432, "result_checksum": 2995000000},
+        {"operation": "duplicate_summary_rebuild", "median_ms": 6.253646, "p95_ms": 41.174528, "mean_thread_allocated_bytes": 5279255, "result_checksum": 2000},
+        {"operation": "derive_duplicate_view_uncached", "median_ms": 12.067949, "p95_ms": 21.918029, "mean_thread_allocated_bytes": 11757664, "result_checksum": 33974013823},
+        {"operation": "derive_duplicate_view_reused_summary", "median_ms": 3.955165, "p95_ms": 10.488273, "mean_thread_allocated_bytes": 1858138, "result_checksum": 33974013823}
+      ]
+    }
+  ]
+}
